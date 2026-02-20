@@ -8,6 +8,7 @@ import Toolbar from '../components/editor/Toolbar';
 import PropertiesPanel from '../components/editor/PropertiesPanel';
 import RoomCanvas from '../components/canvas/RoomCanvas';
 import ObjectLibrary from '../components/library/ObjectLibrary';
+import { PRESETS } from '../components/library/PresetObjects';
 import type Konva from 'konva';
 
 type SaveStatus = 'saved' | 'saving' | 'dirty' | 'idle';
@@ -96,7 +97,16 @@ export default function EditorPage() {
           y2: el.y2,
           swing_angle: el.swing_angle,
           swing_dir: el.swing_dir as 'left' | 'right' | null,
-          path_data: pathData ? normalizeLegacyPath(pathData) : pathData,
+          path_data: (() => {
+            if (!pathData) return pathData;
+            if (el.subtype && !el.subtype.startsWith('custom:')) {
+              // Preset element: always use the canonical path from the preset definition
+              // (DB may store stale absolute or incorrectly-normalized data)
+              const preset = PRESETS.find(p => p.id === el.subtype);
+              if (preset && preset.shape.type === 'path') return preset.shape.data;
+            }
+            return normalizeLegacyPath(pathData);
+          })(),
           display_unit: (el.display_unit as CanvasElement['display_unit']) ?? null,
           z_index: el.z_index,
         };
