@@ -52,19 +52,30 @@ export default function FurnitureShape({
           : undefined
       }
     >
-      {hasPath ? (
+      {hasPath ? (() => {
+        const isCustom = element.subtype?.startsWith('custom:') ?? false;
+        const pathScaleX = isCustom
+          ? (element.width ?? 60) * pixelsPerCm * (element.scale_x ?? 1)
+          : pixelsPerCm * (element.scale_x ?? 1);
+        const pathScaleY = isCustom
+          ? (element.height ?? 60) * pixelsPerCm * (element.scale_y ?? 1)
+          : pixelsPerCm * (element.scale_y ?? 1);
+        const pathOffsetX = isCustom ? 0.5 : (element.width ?? 60) / 2;
+        const pathOffsetY = isCustom ? 0.5 : (element.height ?? 60) / 2;
+        return (
         <Path
           data={element.path_data!}
-          scaleX={pixelsPerCm * (element.scale_x ?? 1)}
-          scaleY={pixelsPerCm * (element.scale_y ?? 1)}
-          offsetX={(element.width ?? 60) / 2}
-          offsetY={(element.height ?? 60) / 2}
+          scaleX={pathScaleX}
+          scaleY={pathScaleY}
+          offsetX={pathOffsetX}
+          offsetY={pathOffsetY}
           fill={fillColor}
           stroke={strokeColor}
-          strokeWidth={(selected ? 2 : 1.5) / pixelsPerCm}
-          hitStrokeWidth={6 / pixelsPerCm}
+          strokeWidth={(selected ? 2 : 1.5) / pathScaleX}
+          hitStrokeWidth={6 / pathScaleX}
         />
-      ) : (
+        );
+      })() : (
         <Rect
           width={w}
           height={h}
@@ -86,7 +97,7 @@ export default function FurnitureShape({
           offsetY={4}
           align="center"
           width={w}
-          x={hasPath ? 0 : -w / 2}
+          x={-w / 2}
           listening={false}
         />
       )}

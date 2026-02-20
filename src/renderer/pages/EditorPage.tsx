@@ -69,29 +69,38 @@ export default function EditorPage() {
       useCanvasStore.getState().setGridSizeCm(project.grid_size);
       setProjectId(projectId);
 
-      const mapped: CanvasElement[] = rawElements.map((el) => ({
-        id: el.id,
-        project_id: el.project_id,
-        type: el.type as CanvasElement['type'],
-        subtype: el.subtype,
-        label: el.label,
-        x: el.x,
-        y: el.y,
-        width: el.width,
-        height: el.height,
-        rotation: el.rotation,
-        scale_x: el.scale_x,
-        scale_y: el.scale_y,
-        x1: el.x1,
-        y1: el.y1,
-        x2: el.x2,
-        y2: el.y2,
-        swing_angle: el.swing_angle,
-        swing_dir: el.swing_dir as 'left' | 'right' | null,
-        path_data: el.path_data ? normalizeLegacyPath(el.path_data) : el.path_data,
-        display_unit: (el.display_unit as CanvasElement['display_unit']) ?? null,
-        z_index: el.z_index,
-      }));
+      const mapped: CanvasElement[] = rawElements.map((el) => {
+        // Hydrate path_data from custom object library if missing (legacy placements)
+        let pathData = el.path_data;
+        if (!pathData && el.subtype?.startsWith('custom:')) {
+          const customId = parseInt(el.subtype.slice('custom:'.length), 10);
+          const customDef = customObjects.find((c) => c.id === customId);
+          if (customDef) pathData = customDef.path_data;
+        }
+        return {
+          id: el.id,
+          project_id: el.project_id,
+          type: el.type as CanvasElement['type'],
+          subtype: el.subtype,
+          label: el.label,
+          x: el.x,
+          y: el.y,
+          width: el.width,
+          height: el.height,
+          rotation: el.rotation,
+          scale_x: el.scale_x,
+          scale_y: el.scale_y,
+          x1: el.x1,
+          y1: el.y1,
+          x2: el.x2,
+          y2: el.y2,
+          swing_angle: el.swing_angle,
+          swing_dir: el.swing_dir as 'left' | 'right' | null,
+          path_data: pathData ? normalizeLegacyPath(pathData) : pathData,
+          display_unit: (el.display_unit as CanvasElement['display_unit']) ?? null,
+          z_index: el.z_index,
+        };
+      });
 
       setElements(mapped);
       useCanvasStore.getState().initHistory();
