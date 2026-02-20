@@ -1,13 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectStore, type Project } from '../store/project.store';
 import { ALL_UNITS, UNIT_LABELS, formatUnit, unitToCm, cmToUnit, type DisplayUnit } from '../utils/units';
 
 const GRID_DEFAULTS: Record<DisplayUnit, number> = { cm: 20, m: 0.2, in: 8, ft: 1 };
 
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Modified today';
+  if (diffDays === 1) return 'Modified yesterday';
+  if (diffDays < 7) return `Modified ${diffDays} days ago`;
+  return `Modified ${date.toLocaleDateString()}`;
+}
+
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const { projects, setProjects, addProject, removeProject } = useProjectStore();
+  const { projects, setProjects, addProject, removeProject, updateProjectInList } = useProjectStore();
+  const [duplicating, setDuplicating] = useState<number | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renamingValue, setRenamingValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [showModal, setShowModal] = useState(false);
   const [formName, setFormName] = useState('');
   const [formGrid, setFormGrid] = useState('20');
@@ -22,6 +39,18 @@ export default function ProjectsPage() {
       setLoading(false);
     });
   }, [setProjects]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (openMenuId === null) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [openMenuId]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -44,11 +73,41 @@ export default function ProjectsPage() {
     }
   }
 
+  async function handleDuplicate(project: Project, e: React.MouseEvent) {
+    e.stopPropagation();
+    setOpenMenuId(null);
+    setDuplicating(project.id);
+    try {
+      const copy = await window.api.duplicateProject(project.id);
+      addProject(copy);
+    } finally {
+      setDuplicating(null);
+    }
+  }
+
   async function handleDelete(project: Project, e: React.MouseEvent) {
     e.stopPropagation();
+    setOpenMenuId(null);
     if (!confirm(`Delete "${project.name}"? This cannot be undone.`)) return;
     await window.api.deleteProject(project.id);
     removeProject(project.id);
+  }
+
+  function startRename(project: Project, e: React.MouseEvent) {
+    e.stopPropagation();
+    setOpenMenuId(null);
+    setRenamingId(project.id);
+    setRenamingValue(project.name);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }
+
+  async function commitRename() {
+    const newName = renamingValue.trim();
+    if (newName && renamingId !== null) {
+      const updated = await window.api.updateProject(renamingId, { name: newName });
+      updateProjectInList(updated);
+    }
+    setRenamingId(null);
   }
 
   function openModal() {
@@ -60,7 +119,6 @@ export default function ProjectsPage() {
   }
 
   function handleUnitChange(newUnit: DisplayUnit) {
-    // Convert grid value to new unit
     const currentCm = unitToCm(parseFloat(formGrid) || GRID_DEFAULTS[formGridUnit], formGridUnit);
     const newGridVal = cmToUnit(currentCm, newUnit);
     setFormUnit(newUnit);
@@ -104,25 +162,97 @@ export default function ProjectsPage() {
             {projects.map((project) => (
               <div
                 key={project.id}
-                onClick={() => navigate(`/editor/${project.id}`)}
-                className="bg-gray-50 hover:bg-white border border-gray-200 hover:border-blue-500 rounded-xl p-5 cursor-pointer transition-all group shadow-sm hover:shadow-md"
+                onClick={() => renamingId !== project.id && openMenuId !== project.id && navigate(`/editor/${project.id}`)}
+                className="bg-gray-50 hover:bg-white border border-gray-200 hover:border-blue-500 rounded-xl overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-md"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="text-2xl">🏠</div>
-                  <button
-                    onClick={(e) => handleDelete(project, e)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-sm transition-all px-2 py-1 rounded"
-                  >
-                    Delete
-                  </button>
+                {/* Thumbnail area */}
+                <div className="h-36 bg-gray-100 flex items-center justify-center overflow-hidden border-b border-gray-200">
+                  {project.thumbnail ? (
+                    <img
+                      src={project.thumbnail}
+                      alt={project.name}
+                      className="w-full h-full object-contain"
+                      draggable={false}
+                    />
+                  ) : (
+                    <div className="text-4xl text-gray-300">📐</div>
+                  )}
                 </div>
-                <h3 className="text-gray-900 font-semibold text-lg truncate">{project.name}</h3>
-                <p className="text-gray-500 text-sm mt-1">
-                  Grid: {formatUnit(project.grid_size, (project.default_unit as DisplayUnit) ?? 'cm')}/cell
-                </p>
-                <p className="text-gray-400 text-xs mt-2">
-                  {new Date(project.updated_at).toLocaleDateString()}
-                </p>
+
+                {/* Info area */}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    {renamingId === project.id ? (
+                      <input
+                        ref={renameInputRef}
+                        value={renamingValue}
+                        onChange={(e) => setRenamingValue(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename();
+                          if (e.key === 'Escape') setRenamingId(null);
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 text-gray-900 font-semibold text-base bg-white border border-blue-400 rounded px-2 py-0.5 focus:outline-none"
+                        autoFocus
+                      />
+                    ) : (
+                      <h3
+                        className="text-gray-900 font-semibold text-base leading-snug flex-1 line-clamp-2"
+                        title={project.name}
+                      >
+                        {project.name}
+                      </h3>
+                    )}
+
+                    {/* Kebab menu */}
+                    <div className="relative flex-shrink-0" ref={openMenuId === project.id ? menuRef : undefined}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === project.id ? null : project.id);
+                        }}
+                        className="text-gray-400 hover:text-gray-700 w-7 h-7 flex items-center justify-center rounded hover:bg-gray-200 transition-colors text-lg leading-none"
+                        title="More actions"
+                        aria-label="More actions"
+                      >
+                        ···
+                      </button>
+                      {openMenuId === project.id && (
+                        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[120px]">
+                          <button
+                            onClick={(e) => startRename(project, e)}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            onClick={(e) => handleDuplicate(project, e)}
+                            disabled={duplicating === project.id}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                          >
+                            {duplicating === project.id ? 'Copying…' : 'Duplicate'}
+                          </button>
+                          <div className="my-1 border-t border-gray-100" />
+                          <button
+                            onClick={(e) => handleDelete(project, e)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-400">
+                    Grid: {formatUnit(project.grid_size, (project.default_unit as DisplayUnit) ?? 'cm')}/cell
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {formatRelativeDate(project.updated_at)}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

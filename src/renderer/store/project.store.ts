@@ -7,6 +7,7 @@ export interface Project {
   height_cm: number;
   grid_size: number;
   default_unit?: string | null;
+  thumbnail?: string | null;
   created_at: string;
   updated_at: string;
 }

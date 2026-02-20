@@ -69,6 +69,9 @@ function runMigrations(): void {
   if (!pCols.some((c) => c.name === 'default_unit')) {
     db.exec("ALTER TABLE projects ADD COLUMN default_unit TEXT");
   }
+  if (!pCols.some((c) => c.name === 'thumbnail')) {
+    db.exec("ALTER TABLE projects ADD COLUMN thumbnail TEXT");
+  }
 }
 
 export function initDatabase(): void {

@@ -7,6 +7,7 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  duplicateProject,
   type ProjectInput,
 } from './database/project.model';
 import {
@@ -30,6 +31,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('projects:create', (_e, input: ProjectInput) => createProject(input));
   ipcMain.handle('projects:update', (_e, id: number, updates: Partial<ProjectInput>) => updateProject(id, updates));
   ipcMain.handle('projects:delete', (_e, id: number) => deleteProject(id));
+  ipcMain.handle('projects:duplicate', (_e, id: number) => duplicateProject(id));
 
   // Elements
   ipcMain.handle('elements:getForProject', (_e, projectId: number) => getElementsForProject(projectId));

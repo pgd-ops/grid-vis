@@ -12,16 +12,40 @@ import type Konva from 'konva';
 
 type SaveStatus = 'saved' | 'saving' | 'dirty' | 'idle';
 
+function normalizeLegacyPath(pathData: string, thumbSize = 300): string {
+  // Extract all numbers from M/L path commands
+  const nums = pathData.match(/-?[\d.]+/g);
+  if (!nums || nums.length < 4) return pathData;
+  const coords: number[] = nums.map(Number);
+  // Check if already normalized (all coords 0-1)
+  if (coords.every(n => n >= 0 && n <= 1)) return pathData;
+  // Pair up as x,y
+  const xs: number[] = [], ys: number[] = [];
+  for (let i = 0; i < coords.length - 1; i += 2) {
+    xs.push(coords[i]);
+    ys.push(coords[i + 1]);
+  }
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const rangeX = maxX - minX || thumbSize;
+  const rangeY = maxY - minY || thumbSize;
+  const pts = xs.map((x, i) =>
+    `${((x - minX) / rangeX).toFixed(6)} ${((ys[i] - minY) / rangeY).toFixed(6)}`
+  ).join(' L ');
+  return `M ${pts} Z`;
+}
+
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { setActiveProject } = useProjectStore();
+  const { setActiveProject, activeProject, updateProjectInList } = useProjectStore();
   const { setElements, setProjectId, elements, dirty, setDirty, initHistory } = useCanvasStore();
   const { setCustomObjects } = useLibraryStore();
   const stageRef = useRef<Konva.Stage | null>(null);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [loading, setLoading] = useState(true);
+  const [renamingName, setRenamingName] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const projectId = parseInt(id ?? '0', 10);
@@ -64,7 +88,7 @@ export default function EditorPage() {
         y2: el.y2,
         swing_angle: el.swing_angle,
         swing_dir: el.swing_dir as 'left' | 'right' | null,
-        path_data: el.path_data,
+        path_data: el.path_data ? normalizeLegacyPath(el.path_data) : el.path_data,
         display_unit: (el.display_unit as CanvasElement['display_unit']) ?? null,
         z_index: el.z_index,
       }));
@@ -151,11 +175,38 @@ export default function EditorPage() {
       setDirty(false);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
+
+      // Capture thumbnail (composite onto white background to avoid black JPEG artifacts)
+      if (stageRef.current) {
+        try {
+          const pngUrl = stageRef.current.toDataURL({ pixelRatio: 0.15 });
+          const thumbnail = await new Promise<string>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d')!;
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0);
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.onerror = reject;
+            img.src = pngUrl;
+          });
+          const updated = await window.api.updateProject(projectId, { thumbnail });
+          updateProjectInList(updated);
+          setActiveProject(updated);
+        } catch {
+          // thumbnail capture is non-critical
+        }
+      }
     } catch (err) {
       console.error('Save failed:', err);
       setSaveStatus('dirty');
     }
-  }, [elements, dirty, setDirty]);
+  }, [elements, dirty, setDirty, projectId, updateProjectInList, setActiveProject]);
 
   // Trigger debounced auto-save when dirty
   useEffect(() => {
@@ -167,6 +218,18 @@ export default function EditorPage() {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [dirty, save]);
+
+  async function handleRenameSubmit() {
+    const newName = (renamingName ?? '').trim();
+    if (!newName || !activeProject || newName === activeProject.name) {
+      setRenamingName(null);
+      return;
+    }
+    const updated = await window.api.updateProject(projectId, { name: newName });
+    updateProjectInList(updated);
+    setActiveProject(updated);
+    setRenamingName(null);
+  }
 
   useKeyboardShortcuts({
     onSave: () => save(true),
@@ -190,6 +253,28 @@ export default function EditorPage() {
         >
           ← Projects
         </button>
+        <div className="h-4 w-px bg-gray-200" />
+        {renamingName !== null ? (
+          <input
+            autoFocus
+            value={renamingName}
+            onChange={(e) => setRenamingName(e.target.value)}
+            onBlur={handleRenameSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameSubmit();
+              if (e.key === 'Escape') setRenamingName(null);
+            }}
+            className="text-sm font-medium text-gray-900 bg-white border border-blue-400 rounded px-2 py-0.5 focus:outline-none w-48"
+          />
+        ) : (
+          <button
+            onClick={() => setRenamingName(activeProject?.name ?? '')}
+            className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors max-w-48 truncate"
+            title="Click to rename"
+          >
+            {activeProject?.name ?? ''}
+          </button>
+        )}
         <div className="h-4 w-px bg-gray-200" />
         <Toolbar stageRef={stageRef} />
         <div className="ml-auto flex items-center gap-3">

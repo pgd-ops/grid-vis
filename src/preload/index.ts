@@ -7,6 +7,7 @@ export interface Project {
   height_cm: number;
   grid_size: number;
   default_unit: string | null;
+  thumbnail: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,9 +78,10 @@ const api = {
   getProject: (id: number): Promise<Project | undefined> => ipcRenderer.invoke('projects:get', id),
   createProject: (input: { name: string; width_cm?: number; height_cm?: number; grid_size?: number; default_unit?: string | null }): Promise<Project> =>
     ipcRenderer.invoke('projects:create', input),
-  updateProject: (id: number, updates: Partial<{ name: string; width_cm: number; height_cm: number; grid_size: number; default_unit: string | null }>): Promise<Project> =>
+  updateProject: (id: number, updates: Partial<{ name: string; width_cm: number; height_cm: number; grid_size: number; default_unit: string | null; thumbnail: string | null }>): Promise<Project> =>
     ipcRenderer.invoke('projects:update', id, updates),
   deleteProject: (id: number): Promise<void> => ipcRenderer.invoke('projects:delete', id),
+  duplicateProject: (id: number): Promise<Project> => ipcRenderer.invoke('projects:duplicate', id),
 
   // Elements
   getElementsForProject: (projectId: number): Promise<RoomElement[]> =>
