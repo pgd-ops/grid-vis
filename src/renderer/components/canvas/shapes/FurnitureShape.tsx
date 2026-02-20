@@ -55,14 +55,14 @@ export default function FurnitureShape({
       {hasPath ? (
         <Path
           data={element.path_data!}
-          scaleX={w}
-          scaleY={h}
-          offsetX={0.5}
-          offsetY={0.5}
+          scaleX={pixelsPerCm * (element.scale_x ?? 1)}
+          scaleY={pixelsPerCm * (element.scale_y ?? 1)}
+          offsetX={(element.width ?? 60) / 2}
+          offsetY={(element.height ?? 60) / 2}
           fill={fillColor}
           stroke={strokeColor}
-          strokeWidth={(selected ? 2 : 1.5) / Math.min(w, h)}
-          hitStrokeWidth={6 / Math.min(w, h)}
+          strokeWidth={(selected ? 2 : 1.5) / pixelsPerCm}
+          hitStrokeWidth={6 / pixelsPerCm}
         />
       ) : (
         <Rect
