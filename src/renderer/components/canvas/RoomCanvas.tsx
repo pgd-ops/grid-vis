@@ -33,7 +33,7 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
     gridSizeCm, snapEnabled,
   } = useCanvasStore();
 
-  const { dragItem, setDragItem } = useLibraryStore();
+  const { setDragItem, dragItem } = useLibraryStore();
   const { activeProject } = useProjectStore();
 
   // Resize observer
@@ -70,6 +70,16 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [setSelectedIds]);
+
+  // Reset panning state if mouse is released outside the canvas
+  useEffect(() => {
+    function handleWindowMouseUp() {
+      isPanning.current = false;
+      lastPointer.current = null;
+    }
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => window.removeEventListener('mouseup', handleWindowMouseUp);
+  }, []);
 
   function getPointerPos(stage: Konva.Stage) {
     const pos = stage.getPointerPosition();
@@ -135,9 +145,14 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
         return;
       }
       if (tool === 'select') {
-        // Clicked on empty stage area
-        if (e.target === stage || e.target === stage.findOne('Layer')) {
+        // Clicked on empty stage area — pan, but not if a library drag is in progress
+        if (
+          (e.target === stage || e.target === stage.findOne('Layer')) &&
+          !useLibraryStore.getState().dragItem
+        ) {
           setSelectedIds([]);
+          isPanning.current = true;
+          lastPointer.current = pos;
         }
       }
     }
@@ -147,8 +162,8 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
     const stage = e.target.getStage()!;
     const pos = getPointerPos(stage);
 
-    // Pan
-    if (isPanning.current && lastPointer.current) {
+    // Pan (skip if a library item is being dragged)
+    if (isPanning.current && lastPointer.current && !useLibraryStore.getState().dragItem) {
       const dx = pos.x - lastPointer.current.x;
       const dy = pos.y - lastPointer.current.y;
       setViewport(stageX + dx, stageY + dy, stageScale);
@@ -162,6 +177,7 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
     if (tool === 'internet_outlet') internetOutletTool.onMouseMove(pos.x, pos.y);
 
     // Library drag ghost
+    const dragItem = useLibraryStore.getState().dragItem;
     if (dragItem) {
       const roomPos = stageToRoom(pos.x, pos.y);
       const snapped = snap(roomPos.x, roomPos.y);
@@ -214,13 +230,15 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
     if (isPanning.current) {
       isPanning.current = false;
       lastPointer.current = null;
-      return;
+      // Still allow library drops even if we were panning
+      if (!useLibraryStore.getState().dragItem) return;
     }
 
     const stage = e.target.getStage()!;
     const pos = getPointerPos(stage);
 
     // Drop from library
+    const dragItem = useLibraryStore.getState().dragItem;
     if (dragItem && e.evt.button === 0) {
       const roomPos = stageToRoom(pos.x, pos.y);
       const snapped = snap(roomPos.x, roomPos.y);

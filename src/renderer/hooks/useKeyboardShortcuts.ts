@@ -42,6 +42,25 @@ export function useKeyboardShortcuts({ onSave, onDelete }: Options = {}) {
         e.preventDefault();
         onSave?.();
       }
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        const { selectedIds: ids, elements, updateElement, pushHistory: push } = useCanvasStore.getState();
+        if (ids.length === 0) return;
+        e.preventDefault();
+        const NUDGE_CM = 1;
+        const dx = e.key === 'ArrowLeft' ? -NUDGE_CM : e.key === 'ArrowRight' ? NUDGE_CM : 0;
+        const dy = e.key === 'ArrowUp'   ? -NUDGE_CM : e.key === 'ArrowDown'  ? NUDGE_CM : 0;
+        ids.forEach(id => {
+          const el = elements.find(el => el.id === id);
+          if (!el) return;
+          if (el.x1 != null && el.y1 != null && el.x2 != null && el.y2 != null) {
+            updateElement(id, { x1: el.x1 + dx, y1: el.y1 + dy, x2: el.x2 + dx, y2: el.y2 + dy });
+          } else {
+            updateElement(id, { x: (el as any).x + dx, y: (el as any).y + dy });
+          }
+        });
+        push();
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown);
