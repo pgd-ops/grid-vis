@@ -163,7 +163,7 @@ export default function ProjectsPage() {
               <div
                 key={project.id}
                 onClick={() => renamingId !== project.id && openMenuId !== project.id && navigate(`/editor/${project.id}`)}
-                className="bg-gray-50 hover:bg-white border border-gray-200 hover:border-blue-500 rounded-xl overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-md"
+                className="bg-gray-50 hover:bg-white border border-gray-200 hover:border-blue-500 rounded-xl cursor-pointer transition-all shadow-sm hover:shadow-md"
               >
                 {/* Thumbnail area */}
                 <div className="h-36 bg-gray-100 flex items-center justify-center overflow-hidden border-b border-gray-200">
