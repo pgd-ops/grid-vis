@@ -111,6 +111,13 @@ export default function EditorPage() {
         z_index: el.z_index,
       }));
 
+      const { loadedIds, elements: currentElements } = useCanvasStore.getState();
+      const currentNumericIds = new Set(
+        currentElements.map((e) => e.id).filter((id): id is number => typeof id === 'number')
+      );
+      const idsToDelete = [...loadedIds].filter((id) => !currentNumericIds.has(id));
+      await Promise.all(idsToDelete.map((id) => window.api.deleteElement(id)));
+
       if (upsertInputs.length > 0) {
         const saved = await window.api.upsertElements(upsertInputs);
         // Update element ids for newly created elements
@@ -135,6 +142,10 @@ export default function EditorPage() {
           return el;
         });
         setEls(updatedEls);
+      } else if (idsToDelete.length > 0) {
+        // No new elements, but we deleted some — update loadedIds to reflect current state
+        const { elements: currentEls, setElements: setEls } = useCanvasStore.getState();
+        setEls(currentEls);
       }
 
       setDirty(false);

@@ -66,6 +66,7 @@ interface CanvasState {
 
   // Elements
   elements: CanvasElement[];
+  loadedIds: Set<number>;
   addElement: (el: CanvasElement) => void;
   updateElement: (id: number | string, updates: Partial<CanvasElement>) => void;
   removeElement: (id: number | string) => void;
@@ -114,6 +115,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setGhostElement: (ghostElement) => set({ ghostElement }),
 
   elements: [],
+  loadedIds: new Set<number>(),
   addElement: (el) => {
     set((s) => ({ elements: [...s.elements, el], dirty: true }));
   },
@@ -129,7 +131,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       dirty: true,
     }));
   },
-  setElements: (elements) => set({ elements }),
+  setElements: (elements) => {
+    const loadedIds = new Set<number>(
+      elements.map((e) => e.id).filter((id): id is number => typeof id === 'number')
+    );
+    set({ elements, loadedIds });
+  },
 
   selectedIds: [],
   setSelectedIds: (selectedIds) => set({ selectedIds }),
