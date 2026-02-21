@@ -13,6 +13,34 @@ interface FurnitureShapeProps {
   onTransformEnd?: (x: number, y: number, scaleX: number, scaleY: number, rotation: number) => void;
 }
 
+const SUBTYPE_COLORS: Record<string, string> = {
+  'desk':      '#3b82f6',
+  'standing':  '#06b6d4',
+  'chair':     '#8b5cf6',
+  'sofa':      '#6d28d9',
+  'table':     '#92400e',
+  'bookshelf': '#065f46',
+  'filing':    '#047857',
+  'monitor':   '#374151',
+  'tv':        '#1f2937',
+  'printer':   '#374151',
+  'window':    '#0ea5e9',
+  'column':    '#6b7280',
+};
+
+function getCategoryColor(subtype?: string | null): string {
+  if (!subtype || subtype.startsWith('custom:')) return '#6b7280';
+  const prefix = subtype.split('-')[0];
+  return SUBTYPE_COLORS[prefix] ?? '#6b7280';
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export default function FurnitureShape({
   element,
   pixelsPerCm,
@@ -26,8 +54,13 @@ export default function FurnitureShape({
   const h = (element.height ?? 60) * pixelsPerCm * (element.scale_y ?? 1);
   const hasPath = !!element.path_data;
 
-  const fillColor = ghost ? 'rgba(96,165,250,0.2)' : 'rgba(37,99,235,0.12)';
-  const strokeColor = ghost ? 'rgba(96,165,250,0.5)' : selected ? '#2563eb' : '#2563eb';
+  const categoryColor = getCategoryColor(element.subtype);
+  const fillColor = ghost ? 'rgba(96,165,250,0.2)' : hexToRgba(categoryColor, 0.14);
+  const strokeColor = ghost ? 'rgba(96,165,250,0.5)' : categoryColor;
+
+  const minDim = Math.min(w, h);
+  const fontSize = Math.max(11, Math.min(16, minDim * 0.18));
+  const showLabel = !ghost && element.label && (minDim > 24 || selected);
 
   return (
     <Group
@@ -73,6 +106,10 @@ export default function FurnitureShape({
           stroke={strokeColor}
           strokeWidth={(selected ? 2 : 1.5) / pathScaleX}
           hitStrokeWidth={6 / pathScaleX}
+          shadowColor={categoryColor}
+          shadowBlur={8}
+          shadowOpacity={0.35}
+          shadowEnabled={selected}
         />
         );
       })() : (
@@ -86,18 +123,23 @@ export default function FurnitureShape({
           strokeWidth={selected ? 2 : 1.5}
           cornerRadius={3}
           hitStrokeWidth={6}
+          shadowColor={categoryColor}
+          shadowBlur={8}
+          shadowOpacity={0.35}
+          shadowEnabled={selected}
         />
       )}
-      {!ghost && element.label && (
+      {showLabel && (
         <Text
           text={element.label}
-          fontSize={9}
-          fill="#1d4ed8"
-          offsetX={0}
-          offsetY={4}
-          align="center"
-          width={w}
+          fontSize={fontSize}
+          fill="#1a1a1a"
           x={-w / 2}
+          y={-h / 2}
+          width={w}
+          height={h}
+          align="center"
+          verticalAlign="middle"
           listening={false}
         />
       )}
