@@ -45,12 +45,12 @@ function ToolButton({ t, active, onClick }: { t: ToolDef; active: boolean; onCli
 }
 
 export default function Toolbar({ stageRef }: ToolbarProps) {
-  const { tool, setTool, undo, redo, history, historyIndex } = useCanvasStore();
+  const { tool, setTool, undo, redo, history, historyIndex, exportRegion, clearExportRegion } = useCanvasStore();
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
   const { activeProject } = useProjectStore();
   const containerRef = useRef<HTMLDivElement>(null);
-  const { exportPng, exportPdf, zoomToFit } = useExport(stageRef);
+  const { exportPng, zoomToFit } = useExport(stageRef);
 
   function handleZoomToFit() {
     const container = containerRef.current?.closest('.flex-1');
@@ -102,6 +102,26 @@ export default function Toolbar({ stageRef }: ToolbarProps) {
       </button>
 
       <div className="h-4 w-px bg-gray-200 mx-1" />
+      <button
+        title={exportRegion ? 'Clear Export Region' : 'Set Export Region'}
+        onClick={() => {
+          if (exportRegion) {
+            clearExportRegion();
+            if (tool === 'export_region') setTool('select');
+          } else {
+            setTool('export_region');
+          }
+        }}
+        className={`px-3 py-1.5 rounded text-sm transition-colors border ${
+          tool === 'export_region' || exportRegion
+            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+            : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200'
+        }`}
+      >
+        ⬚
+      </button>
+
+      <div className="h-4 w-px bg-gray-200 mx-1" />
       {activeProject && (
         <>
           <button
@@ -110,13 +130,6 @@ export default function Toolbar({ stageRef }: ToolbarProps) {
             title="Export PNG"
           >
             PNG
-          </button>
-          <button
-            onClick={exportPdf}
-            className="px-3 py-1.5 rounded text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 transition-colors"
-            title="Export PDF"
-          >
-            PDF
           </button>
         </>
       )}

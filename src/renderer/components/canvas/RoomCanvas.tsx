@@ -9,6 +9,7 @@ import WallsLayer from './WallsLayer';
 import AnnotationsLayer from './AnnotationsLayer';
 import FurnitureLayer from './FurnitureLayer';
 import SelectionLayer from './SelectionLayer';
+import ExportRegionLayer from './ExportRegionLayer';
 import { WallDrawTool } from './tools/WallDrawTool';
 import { DoorPlaceTool } from './tools/DoorPlaceTool';
 import { OutletPlaceTool } from './tools/OutletPlaceTool';
@@ -27,11 +28,15 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
   const [size, setSize] = useState({ width: 800, height: 600 });
 
   const {
-    tool, stageX, stageY, stageScale, setViewport,
+    tool, setTool, stageX, stageY, stageScale, setViewport,
     setSelectedIds, setGhostWall, setGhostElement,
     pixelsPerCm, addElement, pushHistory, projectId,
-    gridSizeCm, snapEnabled,
+    gridSizeCm, snapEnabled, setExportRegion,
   } = useCanvasStore();
+
+  // Live rect while drawing export region
+  const exportRegionStart = useRef<{ x: number; y: number } | null>(null);
+  const [liveExportRect, setLiveExportRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   const { setDragItem, dragItem } = useLibraryStore();
   const { activeProject } = useProjectStore();
@@ -140,6 +145,12 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
 
     // Left click
     if (e.evt.button === 0) {
+      if (tool === 'export_region') {
+        const roomPos = stageToRoom(pos.x, pos.y);
+        exportRegionStart.current = roomPos;
+        setLiveExportRect({ x: roomPos.x, y: roomPos.y, w: 0, h: 0 });
+        return;
+      }
       if (tool === 'wall') {
         wallTool.onMouseDown(pos.x, pos.y);
         return;
@@ -171,6 +182,17 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
       return;
     }
 
+    if (tool === 'export_region' && exportRegionStart.current) {
+      const roomPos = stageToRoom(pos.x, pos.y);
+      const start = exportRegionStart.current;
+      setLiveExportRect({
+        x: Math.min(start.x, roomPos.x),
+        y: Math.min(start.y, roomPos.y),
+        w: Math.abs(roomPos.x - start.x),
+        h: Math.abs(roomPos.y - start.y),
+      });
+      return;
+    }
     if (tool === 'wall') wallTool.onMouseMove(pos.x, pos.y);
     if (tool === 'door') doorTool.onMouseMove(pos.x, pos.y);
     if (tool === 'power_outlet') powerOutletTool.onMouseMove(pos.x, pos.y);
@@ -227,6 +249,16 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
   }
 
   function handleMouseUp(e: Konva.KonvaEventObject<MouseEvent>) {
+    if (tool === 'export_region' && exportRegionStart.current && liveExportRect) {
+      if (liveExportRect.w > 1 && liveExportRect.h > 1) {
+        setExportRegion(liveExportRect);
+      }
+      exportRegionStart.current = null;
+      setLiveExportRect(null);
+      setTool('select');
+      return;
+    }
+
     if (isPanning.current) {
       isPanning.current = false;
       lastPointer.current = null;
@@ -306,7 +338,7 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-white" style={{ cursor: getCursor(tool, !!dragItem) }}>
+    <div ref={containerRef} className="w-full h-full bg-white" style={{ cursor: getCursor(tool, !!dragItem) }} onMouseLeave={() => { if (tool === 'export_region' && exportRegionStart.current) { exportRegionStart.current = null; setLiveExportRect(null); } }}>
       <Stage
         ref={stageRef}
         width={size.width}
@@ -325,6 +357,7 @@ export default function RoomCanvas({ stageRef }: RoomCanvasProps) {
         <WallsLayer />
         <AnnotationsLayer />
         <FurnitureLayer />
+        <ExportRegionLayer liveRect={liveExportRect} />
         <SelectionLayer />
       </Stage>
     </div>
@@ -336,6 +369,7 @@ function getCursor(tool: string, isDragging: boolean): string {
   switch (tool) {
     case 'pan': return 'grab';
     case 'wall': return 'crosshair';
+    case 'export_region': return 'crosshair';
     case 'door':
     case 'power_outlet':
     case 'internet_outlet': return 'cell';

@@ -67,7 +67,7 @@ export function registerIpcHandlers(): void {
       filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
     });
     if (result.canceled || !result.filePath) return false;
-    const base64 = dataUri.replace(/^data:application\/pdf;base64,/, '');
+    const base64 = dataUri.split(',').slice(1).join(',');
     fs.writeFileSync(result.filePath, Buffer.from(base64, 'base64'));
     return true;
   });

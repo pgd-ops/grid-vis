@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { DisplayUnit } from '../utils/units';
 
-export type ToolMode = 'select' | 'pan' | 'wall' | 'door' | 'power_outlet' | 'internet_outlet';
+export type ToolMode = 'select' | 'pan' | 'wall' | 'door' | 'power_outlet' | 'internet_outlet' | 'export_region';
 
 export interface CanvasElement {
   /** Numeric id once persisted; temp string like 'tmp-<uuid>' before first save */
@@ -83,6 +83,11 @@ interface CanvasState {
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
+
+  // Export region (in cm, room coordinates)
+  exportRegion: { x: number; y: number; w: number; h: number } | null;
+  setExportRegion: (r: { x: number; y: number; w: number; h: number }) => void;
+  clearExportRegion: () => void;
 
   // Dirty flag
   dirty: boolean;
@@ -174,6 +179,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       dirty: true,
     });
   },
+
+  exportRegion: null,
+  setExportRegion: (exportRegion) => set({ exportRegion }),
+  clearExportRegion: () => set({ exportRegion: null }),
 
   dirty: false,
   setDirty: (dirty) => set({ dirty }),
