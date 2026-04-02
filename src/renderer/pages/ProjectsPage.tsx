@@ -127,7 +127,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 p-8">
+    <div className="min-h-screen bg-white text-gray-900 p-8 overflow-y-auto">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
