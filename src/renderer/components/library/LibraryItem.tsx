@@ -17,7 +17,7 @@ export function PresetLibraryItem({ preset }: PresetItemProps) {
     >
       {/* Simple colored thumbnail */}
       <div
-        className="w-8 h-6 rounded flex-shrink-0 border border-gray-200"
+        className={`w-8 h-6 flex-shrink-0 border border-gray-200 ${preset.id === 'table-round' ? 'rounded-full' : 'rounded'}`}
         style={{ backgroundColor: (preset.shape as { color?: string }).color ?? '#3b82f6', opacity: 0.5 }}
       />
       <span className="text-xs text-gray-700 truncate">{preset.label}</span>

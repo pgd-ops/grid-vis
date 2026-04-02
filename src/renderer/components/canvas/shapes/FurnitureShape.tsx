@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, Rect, Path, Text } from 'react-konva';
+import { Group, Rect, Path, Text, Ellipse } from 'react-konva';
 import type { CanvasElement } from '../../../store/canvas.store';
 
 interface FurnitureShapeProps {
@@ -85,7 +85,20 @@ export default function FurnitureShape({
           : undefined
       }
     >
-      {hasPath ? (() => {
+      {element.subtype === 'table-round' ? (
+        <Ellipse
+          radiusX={w / 2}
+          radiusY={h / 2}
+          fill={fillColor}
+          stroke={strokeColor}
+          strokeWidth={selected ? 2 : 1.5}
+          hitStrokeWidth={6}
+          shadowColor={categoryColor}
+          shadowBlur={8}
+          shadowOpacity={0.35}
+          shadowEnabled={selected}
+        />
+      ) : hasPath ? (() => {
         const isCustom = element.subtype?.startsWith('custom:') ?? false;
         const pathScaleX = isCustom
           ? (element.width ?? 60) * pixelsPerCm * (element.scale_x ?? 1)
